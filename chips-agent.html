@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chips Agent — 技术介绍</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .page-header {
+            padding: 120px 0 60px;
+            text-align: center;
+            background: linear-gradient(135deg, var(--primary) 0%, #7c3aed 100%);
+            color: #fff;
+        }
+        .page-header h1 { font-size: 2.5rem; margin-bottom: 0.5rem; color: #fff; }
+        .page-header p { font-size: 1.1rem; opacity: 0.9; max-width: 600px; margin: 0 auto; }
+        .page-header .icon { font-size: 3rem; margin-bottom: 1rem; }
+
+        .content-section {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 60px 2rem;
+        }
+        .content-section h2 {
+            font-size: 1.6rem;
+            color: var(--primary);
+            margin: 2.5rem 0 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--primary);
+        }
+        .content-section h2:first-child { margin-top: 0; }
+        .content-section h3 {
+            font-size: 1.15rem;
+            margin: 1.5rem 0 0.5rem;
+            color: var(--text);
+        }
+        .content-section p, .content-section li {
+            line-height: 1.8;
+            color: var(--text-secondary);
+        }
+        .content-section ul {
+            padding-left: 1.5rem;
+            margin: 0.5rem 0 1rem;
+        }
+        .content-section li { margin-bottom: 0.3rem; }
+
+        .tech-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0 1.5rem;
+        }
+        .tech-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.2rem;
+            text-align: center;
+        }
+        .tech-card i { font-size: 1.8rem; color: var(--primary); margin-bottom: 0.5rem; }
+        .tech-card h4 { font-size: 0.95rem; margin-bottom: 0.3rem; }
+        .tech-card p { font-size: 0.85rem; margin: 0; }
+
+        /* ===== 架构分层图 ===== */
+        .arch-layers {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            margin: 1.5rem 0;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .arch-layer {
+            display: flex;
+            align-items: center;
+            padding: 0.9rem 1.2rem;
+            border-bottom: 1px solid var(--border);
+            transition: background 0.2s;
+        }
+        .arch-layer:last-child { border-bottom: none; }
+        .arch-layer:hover { filter: brightness(1.05); }
+
+        /* agent 行特殊处理 — 带子行 */
+        .arch-layer--agent {
+            flex-direction: column;
+            align-items: stretch;
+            padding: 0;
+        }
+        .arch-layer--agent .arch-layer { padding: 0.9rem 1.2rem; border-bottom: 1px dashed var(--border); }
+        .arch-layer--agent .arch-layer:last-child { border-bottom: none; }
+        .arch-layer--agent .arch-layer:hover { filter: none; }
+
+        .arch-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            color: #fff;
+            flex-shrink: 0;
+        }
+        .arch-icon--agent     { background: #6366f1; }
+        .arch-icon--tool      { background: #8b5cf6; }
+        .arch-icon--memory    { background: #a855f7; }
+        .arch-icon--safety    { background: #ef4444; }
+        .arch-icon--session   { background: #10b981; }
+        .arch-icon--env       { background: #f59e0b; }
+        .arch-icon--sub       { background: #6b7280; }
+        .arch-icon--dep-zero  { background: #6b7280; width: 28px; height: 28px; font-size: 0.7rem; }
+
+        .arch-info { flex: 1; margin-left: 1rem; min-width: 0; }
+        .arch-info .name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text);
+        }
+        .arch-info .desc {
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+            margin-top: 0.1rem;
+        }
+        .arch-badge {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.55rem;
+            border-radius: 4px;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+        .arch-badge--dep { background: #fef3c7; color: #92400e; }
+        .arch-badge--free { background: #d1fae5; color: #065f46; }
+        .arch-badge--agent { background: #e0e7ff; color: #3730a3; }
+        .arch-badge--tool { background: #ede9fe; color: #5b21b6; }
+        .arch-badge--zero { background: #f3f4f6; color: #4b5563; }
+
+        .arch-connector {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.25rem 0;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            position: relative;
+        }
+        .arch-connector::before {
+            content: '';
+            width: 2px;
+            height: 16px;
+            background: var(--border);
+            position: absolute;
+            left: 18px;
+            top: 0;
+        }
+        .arch-connector span {
+            background: var(--bg);
+            padding: 0 0.5rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ===== 文件树 ===== */
+        .file-tree {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1rem 1.5rem;
+            margin: 1rem 0 1.5rem;
+            font-size: 0.9rem;
+            line-height: 2;
+        }
+        .file-tree .dir {
+            font-weight: 600;
+            color: var(--primary);
+        }
+        .file-tree .dir i { width: 1.2rem; margin-right: 0.3rem; }
+        .file-tree .file {
+            padding-left: 1.8rem;
+            color: var(--text-secondary);
+        }
+        .file-tree .file i { width: 1.2rem; margin-right: 0.3rem; color: #9ca3af; }
+        .file-tree .file .desc {
+            color: var(--text-secondary);
+            opacity: 0.7;
+            margin-left: 0.5rem;
+            font-size: 0.82rem;
+        }
+
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0 1.5rem;
+        }
+        .feature-item {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.2rem;
+        }
+        .feature-item h4 {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            color: var(--text);
+        }
+        .feature-item h4 i { color: var(--primary); margin-right: 0.4rem; }
+        .feature-item p { font-size: 0.9rem; margin: 0; }
+
+        .bottom-cta {
+            text-align: center;
+            padding: 60px 2rem;
+            border-top: 1px solid var(--border);
+        }
+        .bottom-cta h2 { margin-bottom: 1rem; border: none; }
+        .bottom-cta .btn { margin: 0 0.5rem; }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 2rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+        }
+        .back-link:hover { color: var(--primary); }
+
+        @media (max-width: 768px) {
+            .page-header { padding: 100px 1rem 40px; }
+            .page-header h1 { font-size: 1.8rem; }
+            .content-section { padding: 40px 1rem; }
+        }
+    </style>
+</head>
+<body>
+    <nav id="navbar">
+        <div class="nav-container">
+            <div class="logo" onclick="location.href='index.html'" style="cursor:pointer">ChipsFun</div>
+            <ul class="nav-links">
+                <li><a href="index.html#home">首页</a></li>
+                <li><a href="index.html#about">网站介绍</a></li>
+                <li><a href="index.html#projects">项目</a></li>
+                <li><a href="index.html#contact">联系</a></li>
+            </ul>
+            <div class="burger" id="burger">
+                <i class="fas fa-bars"></i>
+            </div>
+        </div>
+    </nav>
+
+    <div class="page-header">
+        <div class="icon"><i class="fas fa-robot"></i></div>
+        <h1>Chips Agent</h1>
+        <p>通用 AI Agent 框架 — ReAct 循环 · 多工具编排 · 安全沙盒 · 持久记忆</p>
+    </div>
+
+    <div class="content-section">
+        <h2>概述</h2>
+        <p>
+            Chips Agent 是一个通用的 AI Agent 框架，采用 Python 3.12+ 构建。
+            它实现了一套完整的 ReAct（Reasoning + Acting）循环，将大语言模型与工具执行、持久记忆、
+            安全控制、沙盒环境、MCP 集成和可观测性连接在一起。
+        </p>
+        <p>
+            项目设计遵循"零依赖约束"——核心模块之间没有循环依赖，工具、安全、会话和记忆模块
+            对项目内部零依赖，保证了高度的模块化和可测试性。
+        </p>
+
+        <h2>技术栈</h2>
+        <div class="tech-grid">
+            <div class="tech-card"><i class="fab fa-python"></i><h4>Python 3.12+</h4><p>全异步能力，类型安全</p></div>
+            <div class="tech-card"><i class="fas fa-brain"></i><h4>多模型网关</h4><p>DeepSeek / GPT / Claude / Gemini</p></div>
+            <div class="tech-card"><i class="fas fa-cubes"></i><h4>工具注册表</h4><p>15+ 内置工具，自注册机制</p></div>
+            <div class="tech-card"><i class="fas fa-database"></i><h4>SQLite + FTS5</h4><p>会话持久化 + 全文搜索</p></div>
+            <div class="tech-card"><i class="fas fa-shield-alt"></i><h4>安全层</h4><p>命令审批 · 凭证剥离 · 审计日志</p></div>
+            <div class="tech-card"><i class="fas fa-box"></i><h4>Docker 沙盒</h4><p>隔离执行，--cap-drop ALL</p></div>
+            <div class="tech-card"><i class="fas fa-plug"></i><h4>MCP 协议</h4><p>外部工具服务器集成</p></div>
+            <div class="tech-card"><i class="fas fa-chart-line"></i><h4>Prometheus</h4><p>可观测性 · 指标 · 追踪</p></div>
+        </div>
+
+        <h2>架构设计</h2>
+        <p>系统分为六个核心模块，遵循严格的分层依赖关系：</p>
+
+        <div class="arch-layers">
+            <!-- Agent 层 — 最上层，依赖其他模块接口 -->
+            <div class="arch-layer arch-layer--agent" style="background:var(--card-bg)">
+                <div class="arch-layer" style="background:#faf5ff">
+                    <div class="arch-icon arch-icon--agent"><i class="fas fa-cog"></i></div>
+                    <div class="arch-info">
+                        <div class="name">agent / — 编排层</div>
+                        <div class="desc">CLI 入口 · ReAct 循环 · Prompt 组装 · TUI · 上下文压缩</div>
+                    </div>
+                    <span class="arch-badge arch-badge--agent">依赖接口，不依赖实现</span>
+                </div>
+                <div class="arch-layer" style="padding:0.5rem 1.2rem;background:transparent">
+                    <span style="font-size:0.8rem;color:var(--text-secondary)">
+                        <i class="fas fa-arrow-down"></i> 通过构造函数注入接收依赖
+                    </span>
+                </div>
+            </div>
+
+            <!-- 平级模块行 -->
+            <div class="arch-layer" style="background:#f1f5f9">
+                <div class="arch-icon arch-icon--tool"><i class="fas fa-wrench"></i></div>
+                <div class="arch-info">
+                    <div class="name">tool / — 工具系统</div>
+                    <div class="desc">ToolRegistry · 15 个内置工具 · 运行时热启用/禁用</div>
+                </div>
+                <span class="arch-badge arch-badge--zero">零依赖</span>
+            </div>
+
+            <div class="arch-layer" style="background:#f1f5f9">
+                <div class="arch-icon arch-icon--memory"><i class="fas fa-brain"></i></div>
+                <div class="arch-info">
+                    <div class="name">memory / — 记忆系统</div>
+                    <div class="desc">MemoryProvider 协议 · 文件存储 · 实验性 HRR 全息记忆</div>
+                </div>
+                <span class="arch-badge arch-badge--zero">零依赖</span>
+            </div>
+
+            <div class="arch-layer" style="background:#f1f5f9">
+                <div class="arch-icon arch-icon--safety"><i class="fas fa-shield-alt"></i></div>
+                <div class="arch-info">
+                    <div class="name">safety / — 安全层</div>
+                    <div class="desc">命令三层审批 · 凭证剥离 · SHA-256 哈希链审计日志</div>
+                </div>
+                <span class="arch-badge arch-badge--zero">零依赖</span>
+            </div>
+
+            <div class="arch-layer" style="background:#f1f5f9">
+                <div class="arch-icon arch-icon--session"><i class="fas fa-database"></i></div>
+                <div class="arch-info">
+                    <div class="name">session / — 持久化</div>
+                    <div class="desc">SQLite (WAL + FTS5) · 会话历史 · 用量记录 · 全文搜索</div>
+                </div>
+                <span class="arch-badge arch-badge--zero">零依赖</span>
+            </div>
+
+            <!-- 指向 environment 的连接 -->
+            <div class="arch-connector"><span><i class="fas fa-long-arrow-alt-down"></i> safety 被 environment 依赖</span></div>
+
+            <!-- Environment 层 -->
+            <div class="arch-layer" style="background:#fffbeb">
+                <div class="arch-icon arch-icon--env"><i class="fas fa-box"></i></div>
+                <div class="arch-info">
+                    <div class="name">environment / — 沙盒环境</div>
+                    <div class="desc">LocalEnvironment（子进程）· DockerEnvironment（容器隔离）</div>
+                </div>
+                <span class="arch-badge arch-badge--dep">依赖 safety</span>
+            </div>
+        </div>
+
+        <p style="font-size:0.85rem;color:var(--text-secondary);text-align:center;margin-top:-0.5rem">
+            <i class="fas fa-info-circle"></i> 「零依赖」= 不引用其他任何内部模块
+        </p>
+
+        <h3>ReAct 循环</h3>
+        <p>
+            核心循环 <code>AIAgent.run_conversation()</code> 最多执行 20 轮推理-行动迭代。
+            每一轮：构建 double-layer 系统提示（冻结缓存 + 动态感知）→ 调用 LLM →
+            处理 tool_calls → 分发到注册表 → 检测循环/故障 → 保存到会话数据库。
+            内置自动循环检测（4 次相同工具签名）和连续故障断路器（3 次失败）。
+        </p>
+
+        <h3>Prompt 构建</h3>
+        <p>
+            双阶段提示系统：<code>build_frozen()</code> 组装身份、记忆快照、技能索引，
+            一次构建整会话缓存（前缀缓存友好）；<code>build_dynamic()</code> 每轮重建
+            时间戳、预取上下文、工具集可用性表。内置提示注入检测（零宽字符、base64 编码指令、
+            Unicode 转义、中英文模式）。
+        </p>
+
+        <h2>核心特性</h2>
+        <div class="feature-list">
+            <div class="feature-item">
+                <h4><i class="fas fa-toolbox"></i> 工具系统</h4>
+                <p>15 个内置工具，覆盖终端、文件、Web、截图、进程、日历、地理位置等。
+                   工具通过 <code>registry.register()</code> 自注册，支持运行时热启用/禁用工具集。</p>
+            </div>
+            <div class="feature-item">
+                <h4><i class="fas fa-code-branch"></i> 多工具编排</h4>
+                <p>四种委派模式：single（单工具）、supervisor（顺序/并行）、pipeline（链式接力）、debate（辩论比较）。AgentPool 线程池并发控制。</p>
+            </div>
+            <div class="feature-item">
+                <h4><i class="fas fa-compress-alt"></i> 上下文压缩</h4>
+                <p>当提示超过 50% 上下文窗口时自动触发。修剪旧工具结果 → 保护头部/尾部 → LLM 摘要中间轮次。结构化摘要模板保留关键信息。</p>
+            </div>
+            <div class="feature-item">
+                <h4><i class="fas fa-brain"></i> 记忆系统</h4>
+                <p>基于文件的 MEMORY.md/USER.md/EPISODIC.md 持久化，支持外部记忆提供者。
+                   实验性全息记忆（HRR）引擎使用相位向量实现组合式记忆。</p>
+            </div>
+            <div class="feature-item">
+                <h4><i class="fas fa-shield"></i> 多层安全</h4>
+                <p>三层命令审批：硬禁止（rm -rf / 等）→ 白名单 → 危险命令交互确认。
+                   环境变量凭证剥离 + 文本模式清理。SHA-256 哈希链审计日志保证完整性。</p>
+            </div>
+            <div class="feature-item">
+                <h4><i class="fas fa-container"></i> 沙盒环境</h4>
+                <p>LocalEnvironment（子进程隔离 + 凭证剥离）和 DockerEnvironment（容器沙盒，
+                   --cap-drop ALL）。通过 Environment 协议抽象，可扩展自定义实现。</p>
+            </div>
+            <div class="feature-item">
+                <h4><i class="fas fa-plug"></i> MCP 集成</h4>
+                <p>通过 Model Context Protocol 连接外部工具服务器。自动工具注册命名空间避免冲突，
+                   后台 asyncio 事件循环，配置文件在 <code>~/.chips/config.yaml</code>。</p>
+            </div>
+            <div class="feature-item">
+                <h4><i class="fas fa-chart-bar"></i> 可观测性</h4>
+                <p>Prometheus 指标（LLM 调用/令牌/成本/延迟）、Langfuse 追踪（可选）、
+                   结构化 JSON 行日志、会话级成本核算、按模型/工具的用量分析报表。</p>
+            </div>
+            <div class="feature-item">
+                <h4><i class="fas fa-file-alt"></i> 技能系统</h4>
+                <p>基于 SKILL.md 文件的延迟加载技能（YAML frontmatter + markdown 正文）。
+                   仅名称+描述在提示中，内容按需查看。灵感来自 Hermes 设计。</p>
+            </div>
+            <div class="feature-item">
+                <h4><i class="fas fa-window-maximize"></i> Web UI</h4>
+                <p>FastAPI + SSE 流式后端，Next.js + TypeScript + Tailwind 前端。
+                   JWT 认证，Prometheus /metrics 端点，Insights 分析 API。</p>
+            </div>
+        </div>
+
+        <h2>项目结构</h2>
+        <div class="file-tree">
+            <div class="dir"><i class="fas fa-folder-open"></i> chips-agent/</div>
+            <div class="file"><i class="far fa-file-code"></i> agent/ <span class="desc">CLI 入口 · ReAct 循环 · Prompt 组装 · TUI · REPL · 上下文引擎</span></div>
+            <div class="file"><i class="far fa-file-code"></i> tool/ <span class="desc">工具注册表 · 工具集 · 15 个内置工具</span></div>
+            <div class="file"><i class="far fa-file-code"></i> safety/ <span class="desc">命令审批 · 凭证剥离 · 审计日志</span></div>
+            <div class="file"><i class="far fa-file-code"></i> session/ <span class="desc">SQLite 持久化 (WAL + FTS5)</span></div>
+            <div class="file"><i class="far fa-file-code"></i> memory/ <span class="desc">记忆管理器 · 文件存储 · 全息 HRR 引擎</span></div>
+            <div class="file"><i class="far fa-file-code"></i> environment/ <span class="desc">沙盒协议 · 本地子进程 · Docker 容器</span></div>
+            <div class="file"><i class="far fa-file-code"></i> gateway/ <span class="desc">LLM 网关 · 多模型 · 速率限制 · 用量统计</span></div>
+            <div class="file"><i class="far fa-file-code"></i> plugins/ <span class="desc">插件管理器 · MCP 客户端 · Langfuse 追踪</span></div>
+            <div class="file"><i class="far fa-file-code"></i> rules/ <span class="desc">路由引擎 · LLM 路由器 · 规则定义</span></div>
+            <div class="file"><i class="far fa-file-code"></i> config/ <span class="desc">YAML 配置 · 代理注册表</span></div>
+            <div class="file"><i class="far fa-file-code"></i> web/ <span class="desc">FastAPI 服务器 · SSE 流式 · 静态资源</span></div>
+            <div class="file"><i class="far fa-file-code"></i> chips-agent-web/ <span class="desc">Next.js + Tailwind 前端</span></div>
+        </div>
+├── config/         YAML 配置 · 代理注册表
+├── web/            FastAPI 服务器 · SSE 流式 · 静态资源
+├── chips-agent-web/ Next.js + Tailwind 前端
+└── gateway/        网关服务 · 路由代理</div>
+
+        <h2>编码约束</h2>
+        <p>项目通过 <code>CLAUDE.md</code> 强制执行严格的分层依赖规则，保证架构整洁度：</p>
+        <ul>
+            <li><strong>tool/</strong> — 零依赖，不引用任何其他内部模块</li>
+            <li><strong>safety/</strong> — 零依赖</li>
+            <li><strong>session/</strong> — 零依赖</li>
+            <li><strong>memory/</strong> — 零依赖</li>
+            <li><strong>environment/</strong> — 仅依赖 safety/</li>
+            <li><strong>agent/</strong> — 通过构造函数注入接收依赖，不直接 import 具体实现类</li>
+        </ul>
+        <p>工具通过 <code>registry.register()</code> 自注册，Agent 只通过 <code>registry.dispatch()</code> 调用工具，不直接引用。</p>
+    </div>
+
+    <div class="bottom-cta">
+        <h2>了解更多</h2>
+        <p style="margin-bottom: 1.5rem; color: var(--text-secondary);">
+            <i class="fab fa-github"></i> 项目已完全开源，欢迎 Star 和贡献
+        </p>
+        <a href="https://github.com/crazychips6/chips-agent" target="_blank" class="btn">
+            <i class="fab fa-github"></i> GitHub 仓库
+        </a>
+        <a href="index.html" class="btn btn-outline">
+            <i class="fas fa-arrow-left"></i> 返回首页
+        </a>
+        <br>
+        <a href="index.html" class="back-link"><i class="fas fa-home"></i> ChipsFun 首页</a>
+    </div>
+
+    <footer id="contact">
+        <div class="footer-container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>关于我</h3>
+                    <p>我是一名热爱技术的开发者，专注于创造优雅的数字体验。通过代码和设计，我致力于构建有意义的产品和服务。</p>
+                    <div class="social-icons">
+                        <a href="https://github.com/crazychips6" target="_blank" aria-label="GitHub"><i class="fab fa-github"></i></a>
+                        <a href="#" aria-label="LinkedIn"><i class="fab fa-linkedin"></i></a>
+                        <a href="#" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
+                        <a href="#" aria-label="微信"><i class="fab fa-weixin"></i></a>
+                    </div>
+                </div>
+                <div class="footer-section">
+                    <h3>快速链接</h3>
+                    <ul class="footer-links">
+                        <li><a href="index.html#home">首页</a></li>
+                        <li><a href="index.html#about">网站介绍</a></li>
+                        <li><a href="index.html#projects">项目展示</a></li>
+                        <li><a href="index.html#contact">联系我</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h3>联系信息</h3>
+                    <div class="footer-contact">
+                        <p><i class="fas fa-envelope"></i>邮箱：<a href="mailto:contact@example.com">contact@example.com</a></p>
+                        <p><i class="fas fa-phone"></i>电话：+86 123-4567-8900</p>
+                        <p><i class="fas fa-map-marker-alt"></i>地址：地球村</p>
+                        <p><i class="fab fa-github"></i>GitHub：<a href="https://github.com/crazychips6" target="_blank">crazychips6</a></p>
+                    </div>
+                </div>
+            </div>
+            <div class="copyright">
+                <p>© 2026 ChipsFun. 保留所有权利. <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">沪ICP备2026028452号</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <div class="back-to-top" id="back-to-top">
+        <i class="fas fa-arrow-up"></i>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
